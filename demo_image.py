@@ -8,6 +8,7 @@ import numpy as np
 import util
 from config_reader import config_reader
 from scipy.ndimage.filters import gaussian_filter
+import scipy.io as sio
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -32,7 +33,7 @@ colors = [[255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0], [170, 255, 0]
           [170, 0, 255], [255, 0, 255], [255, 0, 170], [255, 0, 85]]
 
 
-def process (input_image, params, model_params):
+def process (img_id, input_image, params, model_params):
 
     oriImg = cv2.imread(input_image)  # B,G,R order
     multiplier = [x * model_params['boxsize'] / oriImg.shape[0] for x in params['scale_search']]
@@ -228,22 +229,27 @@ def process (input_image, params, model_params):
                                        360, 1)
             cv2.fillConvexPoly(cur_canvas, polygon, colors[i])
             canvas = cv2.addWeighted(canvas, 0.4, cur_canvas, 0.6, 0)
-
+    sio.savemat('{}.mat'.format(img_id), {'candidate':candidate, 'subset':subset}, do_compression=True)
+    print(candidate)
+    print(subset)
     return canvas
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--image', type=str, required=True, help='input image')
     parser.add_argument('--output', type=str, default='result.png', help='output image')
     parser.add_argument('--model', type=str, default='model/keras/model.h5', help='path to the weights file')
 
+    test_info = open("test_label.txt").read().splitlines()
+    print(test_info)
+
     args = parser.parse_args()
-    input_image = args.image
+    input_image = test_info
+    
     output = args.output
     keras_weights_file = args.model
-
-    tic = time.time()
+    
+    
     print('start processing...')
 
     # load model
@@ -256,13 +262,17 @@ if __name__ == '__main__':
     # load config
     params, model_params = config_reader()
 
+    for img in test_info:
+        tic = time.time()
+        print(img[:-4])
+        img_id = img[:-4]        
     # generate image with body parts
-    canvas = process(input_image, params, model_params)
+        canvas = process(img_id, img, params, model_params)
 
-    toc = time.time()
-    print ('processing time is %.5f' % (toc - tic))
-
-    cv2.imwrite(output, canvas)
+        toc = time.time()
+        print ('processing time is %.5f' % (toc - tic))
+        output = img_id + ".png"
+        cv2.imwrite(output, canvas)
 
     cv2.destroyAllWindows()
 
